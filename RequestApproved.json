@@ -1,0 +1,8 @@
+{
+    "type": "service-request-approved",
+    "emails": ["test@gmail.com"],
+    "data": {
+        "user1": "name",
+        "user2": "name"
+    }
+}

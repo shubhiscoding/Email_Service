@@ -30,17 +30,14 @@ async function verifyEmail(email) {
 }
 
 // Function to send the email
-async function sendEmail(response, subject) {
+async function sendEmail(response) {
     const input = {
         "Destination": {
             "BccAddresses": [],
             "CcAddresses": [
                 "recipient3@example.com"
             ],
-            "ToAddresses": [
-                "recipient1@example.com",
-                "recipient2@example.com"
-            ]
+            "ToAddresses": response.To,
         },
         "Message": {
             "Body": {
@@ -49,7 +46,7 @@ async function sendEmail(response, subject) {
                 }
             },
             "Subject": {
-                "Data": subject,
+                "Data": response.subject,
             }
         },
         "Source": "thatweb3guyy@gmail.com"
@@ -63,7 +60,7 @@ async function sendEmail(response, subject) {
     }
 }
 
-const email_request_queue = process.env.SERVICE_REQUEST_SQS;
+const email_queue = process.env.EMAIL_SERVICE_SQS;
 const email_approved_queue = process.env.SERVICE_REQUEST_APPROVED_SQS;
 const sqsClient = new SQSClient({
     endpoint: process.env.AWS_ENDPOINT,
@@ -74,7 +71,7 @@ const sqsClient = new SQSClient({
     },
 });
 
-async function receiveAndProcessSQSMessage(queue_url, type) {
+async function receiveAndProcessSQSMessage(queue_url) {
     try {
         const receiveMessageCommand = new ReceiveMessageCommand({
             QueueUrl: queue_url,
@@ -90,12 +87,10 @@ async function receiveAndProcessSQSMessage(queue_url, type) {
 
             // First verify the email address
             await verifyEmail("thatweb3guyy@gmail.com");
-            let subject = "Service request approved";
-            if(type === "request") {
-                subject = "Service request received";
-            }
+            
+            const msg = parse(response);
             // Then send the email
-            await sendEmail(response, subject);
+            await sendEmail(msg);
 
             // Delete the message from SQS after processing
             const deleteMessageCommand = new DeleteMessageCommand({
@@ -110,10 +105,34 @@ async function receiveAndProcessSQSMessage(queue_url, type) {
     }
 }
 
+function parse(response) {
+    let subject = "Service Request Created";
+    let To = response.emails;
+    let message = `${response.data['user1']} created a service request for: `;
+    if(response.type === "service-request-approved") {
+        subject = "Service Request Approved";
+        message = `${response.data['user1']} approved the service request for: `;
+    }
+    for(let users in response.data){
+        if(users !== 'user1'){
+            message += `${response.data[users]}, `;
+        }
+    }
+    message = message.slice(0, -2);
+    message += ".";
+    console.log("---------------Email parsed-------------");
+    console.log();
+    console.log("Subject:", subject);
+    console.log("To:", To);
+    console.log("Message:", message);
+    console.log();
+    console.log("-----------------------------------------");
+    return {subject, To, message};
+}
+
 function pollMessages() {
     setInterval(() => {
-        receiveAndProcessSQSMessage(email_request_queue, "request");
-        receiveAndProcessSQSMessage(email_approved_queue, "approved");
+        receiveAndProcessSQSMessage(email_queue);
     }, 5000);
 }
 pollMessages();
