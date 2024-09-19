@@ -21,4 +21,46 @@ Run the docker Image:
 docker compose up
 ```
 
+### Expected SQS Message formats:
+- [Service Request Created](https://github.com/shubhiscoding/Email_Service/blob/main/RequestCreated.json)
+- [Service Request Approved](https://github.com/shubhiscoding/Email_Service/blob/main/RequestApproved.json)
+- [Service Request Completed](https://github.com/shubhiscoding/Email_Service/blob/main/ServiceCompleted.json)
+
 NOTE: The project is meant to be used with localStack and hence the docker-compose.yml is configured with details of localStack.
+
+## Email Templates
+
+### 1. New Service Request
+- **Subject**: "New Service Request Posted"
+- **Template**: [`new-service-request`](https://github.com/shubhiscoding/Email_Service/blob/main/templates/new-service-request.hbs)
+- **Data Object**:
+    ```json
+    {
+        "username": "string",
+        "viewServiceLink": "string"
+    }
+    ```
+
+### 2. Service Request Approved
+- **Subject**: "Your Service Request Has Been Approved!"
+- **Template**: [`service-request-approved`](https://github.com/shubhiscoding/Email_Service/blob/main/templates/service-request-approved.hbs)
+- **Data Object**:
+    ```json
+    {
+        "username": "string",
+        "serviceTitle": "string",
+        "viewServiceLink": "string"
+    }
+    ```
+
+### 3. Service Request Completed
+- **Subject**: "Service Request Completed - Time to Withdraw Your Earnings!"
+- **Template**: [`service-request-completed`](https://github.com/shubhiscoding/Email_Service/blob/main/templates/service-request-completed.hbs)
+- **Data Object**:
+    ```json
+    {
+        "username": "string", 
+        "serviceTitle": "string",
+        "viewServiceLink": "string"
+    }
+    ```
