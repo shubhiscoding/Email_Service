@@ -1,8 +1,9 @@
 {
     "type": "service-request-approved",
-    "emails": ["test@gmail.com"],
+    "emails": ["provider@example.com"],
     "data": {
-        "user1": "name",
-        "user2": "name"
+        "user1": "Jane Smith",
+        "serviceId": "67890",
+        "serviceTitle": "Logo Design"
     }
 }

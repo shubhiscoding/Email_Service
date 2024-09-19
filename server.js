@@ -5,6 +5,10 @@ const {
 } = require("@aws-sdk/client-sqs");
 const { SESClient, SendEmailCommand, VerifyEmailAddressCommand } = require("@aws-sdk/client-ses");
 const dotenv = require('dotenv');
+const fs = require('fs');
+const path = require('path');
+const Handlebars = require('handlebars');
+
 dotenv.config();
 
 const sesClient = new SESClient({
@@ -15,6 +19,17 @@ const sesClient = new SESClient({
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     },
 });
+
+const sqsClient = new SQSClient({
+    endpoint: process.env.AWS_ENDPOINT,
+    region: process.env.AWS_REGION,
+    credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    },
+});
+
+const email_queue = process.env.EMAIL_SERVICE_SQS;
 
 // Function to verify the email address before sending the email
 async function verifyEmail(email) {
@@ -29,28 +44,35 @@ async function verifyEmail(email) {
     }
 }
 
+// Function to load and compile Handlebars template
+function loadTemplate(templateName) {
+    const templatePath = path.join(__dirname, 'templates', `${templateName}.hbs`);
+    const templateContent = fs.readFileSync(templatePath, 'utf-8');
+    return Handlebars.compile(templateContent);
+}
+
 // Function to send the email
-async function sendEmail(response) {
+async function sendEmail(emailData) {
+    const template = loadTemplate(emailData.templateName);
+    const htmlContent = template(emailData.templateData);
+
     const input = {
         "Destination": {
-            "BccAddresses": [],
-            "CcAddresses": [
-                "recipient3@example.com"
-            ],
-            "ToAddresses": response.To,
+            "ToAddresses": emailData.To,
         },
         "Message": {
             "Body": {
-                "Text": {
-                    "Data": response.message,
+                "Html": {
+                    "Data": htmlContent,
                 }
             },
             "Subject": {
-                "Data": response.subject,
+                "Data": emailData.subject,
             }
         },
-        "Source": "thatweb3guyy@gmail.com"
+        "Source": process.env.SENDER_EMAIL,
     };
+
     try {
         const command = new SendEmailCommand(input);
         const response = await sesClient.send(command);
@@ -59,17 +81,6 @@ async function sendEmail(response) {
         console.error("Error sending email:", error);
     }
 }
-
-const email_queue = process.env.EMAIL_SERVICE_SQS;
-const email_approved_queue = process.env.SERVICE_REQUEST_APPROVED_SQS;
-const sqsClient = new SQSClient({
-    endpoint: process.env.AWS_ENDPOINT,
-    region: process.env.AWS_REGION,
-    credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    },
-});
 
 async function receiveAndProcessSQSMessage(queue_url) {
     try {
@@ -88,9 +99,9 @@ async function receiveAndProcessSQSMessage(queue_url) {
             // First verify the email address
             await verifyEmail("thatweb3guyy@gmail.com");
             
-            const msg = parse(response);
+            const emailData = parseMessage(response);
             // Then send the email
-            await sendEmail(msg);
+            await sendEmail(emailData);
 
             // Delete the message from SQS after processing
             const deleteMessageCommand = new DeleteMessageCommand({
@@ -105,29 +116,49 @@ async function receiveAndProcessSQSMessage(queue_url) {
     }
 }
 
-function parse(response) {
-    let subject = "Service Request Created";
-    let To = response.emails;
-    let message = `${response.data['user1']} created a service request for: `;
-    if(response.type === "service-request-approved") {
-        subject = "Service Request Approved";
-        message = `${response.data['user1']} approved the service request for: `;
+function parseMessage(response) {
+    let subject, templateName, templateData;
+    const To = response.emails;
+
+    switch(response.type) {
+        case "new-service-request":
+            subject = "New Service Request Posted";
+            templateName = "new-service-request";
+            templateData = {
+                username: response.data.user1,
+                viewServiceLink: `${process.env.WEBSITE_URL}/service/${response.data.serviceId}`
+            };
+            break;
+        case "service-request-approved":
+            subject = "Your Service Request Has Been Approved!";
+            templateName = "service-request-approved";
+            templateData = {
+                username: response.data.user1,
+                serviceTitle: response.data.serviceTitle,
+                viewServiceLink: `${process.env.WEBSITE_URL}/service/${response.data.serviceId}`
+            };
+            break;
+        case "service-request-completed":
+            subject = "Service Request Completed - Time to Withdraw Your Earnings!";
+            templateName = "service-request-completed";
+            templateData = {
+                username: response.data.user1,
+                serviceTitle: response.data.serviceTitle,
+                viewServiceLink: `${process.env.WEBSITE_URL}/service/${response.data.serviceId}`
+            };
+            break;
+        default:
+            throw new Error("Unknown message type");
     }
-    for(let users in response.data){
-        if(users !== 'user1'){
-            message += `${response.data[users]}, `;
-        }
-    }
-    message = message.slice(0, -2);
-    message += ".";
+
     console.log("---------------Email parsed-------------");
-    console.log();
     console.log("Subject:", subject);
     console.log("To:", To);
-    console.log("Message:", message);
-    console.log();
+    console.log("Template Name:", templateName);
+    console.log("Template Data:", templateData);
     console.log("-----------------------------------------");
-    return {subject, To, message};
+
+    return {subject, To, templateName, templateData};
 }
 
 function pollMessages() {
@@ -135,4 +166,5 @@ function pollMessages() {
         receiveAndProcessSQSMessage(email_queue);
     }, 5000);
 }
+
 pollMessages();

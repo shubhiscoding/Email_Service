@@ -1,9 +1,9 @@
 {
-    "type": "service-request-created",
-    "emails": ["test@gmail.com", "test2@gmail.com"],
+    "type": "new-service-request",
+    "emails": ["user@example.com"],
     "data": {
-        "user1": "name_creator",
-        "user2": "name1",
-        "user3": "name2"
+      "user1": "John Doe",
+      "serviceId": "12345",
+      "serviceTitle": "Website Design"
     }
 }
