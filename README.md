@@ -30,6 +30,8 @@ NOTE: The project is meant to be used with localStack and hence the docker-compo
 
 ## Email Templates
 
+In the server.js you can find the actual implementation of this at this [switch case](https://github.com/shubhiscoding/Email_Service/blob/9ed34f11d88042f766e7cecb2eccea71fd451fb5/server.js#L123)
+
 ### 1. New Service Request
 - **Subject**: "New Service Request Posted"
 - **Template**: [`new-service-request`](https://github.com/shubhiscoding/Email_Service/blob/main/templates/new-service-request.hbs)
